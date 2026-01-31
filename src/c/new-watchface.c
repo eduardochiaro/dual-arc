@@ -1,14 +1,12 @@
 #include <pebble.h>
 
-// Persistent storage keys
-#define STORAGE_MAX_STEPS 20000
-
 // Main window and layers
 static Window *s_main_window;
 static Layer *s_canvas_layer;
 
 // Text layers
-static TextLayer *s_time_layer;
+static TextLayer *s_hour_layer;
+static TextLayer *s_minute_layer;
 static TextLayer *s_ampm_layer;
 static TextLayer *s_date_layer;
 static TextLayer *s_battery_layer;
@@ -20,11 +18,18 @@ static int s_current_steps = 0;
 static int s_max_steps = 10000;  // Default max, will be updated
 
 // Buffers
-static char s_time_buffer[8];
+static char s_hour_buffer[4];
+static char s_minute_buffer[4];
 static char s_ampm_buffer[4];
 static char s_date_buffer[16];
 static char s_battery_buffer[8];
 static char s_steps_buffer[8];
+
+// Settings
+static GColor s_background_color;
+static GColor s_foreground_color;
+static GColor s_secondary_color;
+static bool s_use_24h = true;
 
 // Colors for the arcs and bars
 static GColor s_color_teal;
@@ -34,25 +39,63 @@ static GColor s_color_yellow;
 static GColor s_color_background_yellow;
 static GColor s_color_background_pink;
 
-// Load max steps from persistent storage
-static void load_max_steps() {
-  if (persist_exists(STORAGE_MAX_STEPS)) {
-    s_max_steps = persist_read_int(STORAGE_MAX_STEPS);
-  }
-  if (s_max_steps < 1000) {
-    s_max_steps = 10000;  // Minimum reasonable max
-  }
+// Load settings
+static void load_settings() {
+  s_use_24h = persist_exists(MESSAGE_KEY_USE_24_HOUR) ? persist_read_bool(MESSAGE_KEY_USE_24_HOUR) : true;
+  s_background_color = persist_exists(MESSAGE_KEY_BACKGROUND_COLOR) ? (GColor){ .argb = (uint8_t)persist_read_int(MESSAGE_KEY_BACKGROUND_COLOR) } : GColorBlack;
+  s_foreground_color = persist_exists(MESSAGE_KEY_FOREGROUND_COLOR) ? (GColor){ .argb = (uint8_t)persist_read_int(MESSAGE_KEY_FOREGROUND_COLOR) } : GColorWhite;
+  s_secondary_color = persist_exists(MESSAGE_KEY_SECONDARY_COLOR) ? (GColor){ .argb = (uint8_t)persist_read_int(MESSAGE_KEY_SECONDARY_COLOR) } : GColorLightGray;
+  s_max_steps = persist_exists(MESSAGE_KEY_STEP_GOAL) ? persist_read_int(MESSAGE_KEY_STEP_GOAL) : 10000;
 }
 
-// Save max steps to persistent storage
-static void save_max_steps() {
-  persist_write_int(STORAGE_MAX_STEPS, s_max_steps);
+// Save settings
+static void save_settings() {
+  persist_write_bool(MESSAGE_KEY_USE_24_HOUR, s_use_24h);
+  persist_write_int(MESSAGE_KEY_BACKGROUND_COLOR, s_background_color.argb);
+  persist_write_int(MESSAGE_KEY_FOREGROUND_COLOR, s_foreground_color.argb);
+  persist_write_int(MESSAGE_KEY_SECONDARY_COLOR, s_secondary_color.argb);
+  persist_write_int(MESSAGE_KEY_STEP_GOAL, s_max_steps);
+}
+
+// Inbox received callback
+static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
+  Tuple *use_24h_tuple = dict_find(iterator, MESSAGE_KEY_USE_24_HOUR);
+  bool changed = false;
+  
+  if (use_24h_tuple) {
+    s_use_24h = use_24h_tuple->value->int32 == 1;
+    changed = true;
+  }
+
+  Tuple *bgcolor_tuple = dict_find(iterator, MESSAGE_KEY_BACKGROUND_COLOR);
+  if (bgcolor_tuple) {
+    s_background_color = GColorFromHEX(bgcolor_tuple->value->int32);
+    changed = true;
+  }
+
+  Tuple *hourscolor_tuple = dict_find(iterator, MESSAGE_KEY_FOREGROUND_COLOR);
+  if (hourscolor_tuple) {
+    s_foreground_color = GColorFromHEX(hourscolor_tuple->value->int32);
+    changed = true;
+  }
+
+  Tuple *minutescolor_tuple = dict_find(iterator, MESSAGE_KEY_SECONDARY_COLOR);
+  if (minutescolor_tuple) {
+    s_secondary_color = GColorFromHEX(minutescolor_tuple->value->int32);
+    changed = true;
+  }
+
+  save_settings();
+
+  if (changed) {
+    layer_mark_dirty(s_canvas_layer);
+  }
 }
 
 // Update battery level
 static void battery_callback(BatteryChargeState state) {
   s_battery_level = state.charge_percent;
-  snprintf(s_battery_buffer, sizeof(s_battery_buffer), "%02d %%", s_battery_level);
+  snprintf(s_battery_buffer, sizeof(s_battery_buffer), "%02d%%", s_battery_level);
   if (s_battery_layer) {
     text_layer_set_text(s_battery_layer, s_battery_buffer);
   }
@@ -68,7 +111,6 @@ static void update_steps() {
   // Update max steps if current exceeds it
   if (s_current_steps > s_max_steps) {
     s_max_steps = s_current_steps;
-    save_max_steps();
   }
   
   snprintf(s_steps_buffer, sizeof(s_steps_buffer), "%05d", s_current_steps);
@@ -92,11 +134,19 @@ static void update_time() {
   time_t temp = time(NULL);
   struct tm *tick_time = localtime(&temp);
   
-  // Time in 12-hour format
-  strftime(s_time_buffer, sizeof(s_time_buffer), clock_is_24h_style() ? "%H:%M" : "%I:%M", tick_time);
+  // Hour
+  strftime(s_hour_buffer, sizeof(s_hour_buffer), s_use_24h ? "%H" : "%I", tick_time);
+  
+  // Remove leading zero for 12-hour format
+  if (!s_use_24h && s_hour_buffer[0] == '0') {
+    memmove(s_hour_buffer, s_hour_buffer + 1, strlen(s_hour_buffer));
+  }
+  
+  // Minute
+  strftime(s_minute_buffer, sizeof(s_minute_buffer), "%M", tick_time);
   
   // AM/PM
-  if (!clock_is_24h_style()) {
+  if (!s_use_24h) {
     strftime(s_ampm_buffer, sizeof(s_ampm_buffer), "%p", tick_time);
   }
   
@@ -110,8 +160,11 @@ static void update_time() {
     }
   }
   
-  if (s_time_layer) {
-    text_layer_set_text(s_time_layer, s_time_buffer);
+  if (s_hour_layer) {
+    text_layer_set_text(s_hour_layer, s_hour_buffer);
+  }
+  if (s_minute_layer) {
+    text_layer_set_text(s_minute_layer, s_minute_buffer);
   }
   if (s_ampm_layer) {
     text_layer_set_text(s_ampm_layer, s_ampm_buffer);
@@ -140,7 +193,7 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   graphics_context_set_stroke_color(ctx, GColorDarkGray);
   graphics_context_set_stroke_width(ctx, 1);
   
-  for (int i = -15; i < 15; i++) {
+  for (int i = -15; i <= 15; i++) {
     int32_t angle = TRIG_MAX_ANGLE * i / 60;
     int inner_r = radius - 3;
     int outer_r = radius;
@@ -191,7 +244,7 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
     int32_t arc_range = left_arc_end - left_arc_start;
     int32_t fill_end = left_arc_start + (arc_range * s_battery_level / 100);
     graphics_context_set_stroke_color(ctx, s_color_yellow);
-    graphics_context_set_stroke_width(ctx, arc_width);
+    graphics_context_set_stroke_width(ctx, arc_width - 2);
     graphics_draw_arc(ctx, arc_rect, GOvalScaleModeFitCircle, left_arc_start, fill_end);
   }
   
@@ -207,7 +260,7 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
     int32_t arc_range = right_arc_end - right_arc_start;
     int32_t fill_start = right_arc_end - (arc_range * steps_percent / 100);
     graphics_context_set_stroke_color(ctx, s_color_pink);
-    graphics_context_set_stroke_width(ctx, arc_width);
+    graphics_context_set_stroke_width(ctx, arc_width - 2);
     graphics_draw_arc(ctx, arc_rect, GOvalScaleModeFitCircle, fill_start, right_arc_end);
   }
   
@@ -222,7 +275,7 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
 static TextLayer* create_text_layer(GRect frame, GFont font, GTextAlignment alignment) {
   TextLayer *layer = text_layer_create(frame);
   text_layer_set_background_color(layer, GColorClear);
-  text_layer_set_text_color(layer, GColorWhite);
+  text_layer_set_text_color(layer, s_foreground_color);
   text_layer_set_font(layer, font);
   text_layer_set_text_alignment(layer, alignment);
   return layer;
@@ -243,7 +296,7 @@ static void main_window_load(Window *window) {
   s_color_background_pink = GColorBulgarianRose;
 
   // Set window background
-  window_set_background_color(window, GColorBlack);
+  window_set_background_color(window, s_background_color);
   
   // Create canvas layer for custom drawing
   s_canvas_layer = layer_create(bounds);
@@ -262,16 +315,25 @@ static void main_window_load(Window *window) {
     time_font = fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
   }
   
-  // Time (center, large)
-  s_time_layer = create_text_layer(GRect(0, center.y - 30 , !clock_is_24h_style()? bounds.size.w - 25 : bounds.size.w, 50),
+  // Hour (center left, white)
+  s_hour_layer = create_text_layer(GRect(0, center.y - 30, center.x - 2, 50),
                                     time_font,
-                                    GTextAlignmentCenter);
-  layer_add_child(window_layer, text_layer_get_layer(s_time_layer));
+                                    GTextAlignmentRight);
+  text_layer_set_text_color(s_hour_layer, s_foreground_color);
+  layer_add_child(window_layer, text_layer_get_layer(s_hour_layer));
+  
+  // Minute (center right, light gray)
+  s_minute_layer = create_text_layer(GRect(center.x + 2, center.y - 30, !s_use_24h ? center.x - 27 : center.x, 50),
+                                      time_font,
+                                      GTextAlignmentLeft);
+  text_layer_set_text_color(s_minute_layer, s_secondary_color);
+  layer_add_child(window_layer, text_layer_get_layer(s_minute_layer));
   
   // AM/PM (next to time)
   s_ampm_layer = create_text_layer(GRect(center.x + 42, center.y - 8, 30, 20),
                                     fonts_get_system_font(FONT_KEY_LECO_26_BOLD_NUMBERS_AM_PM),
                                     GTextAlignmentLeft);
+  text_layer_set_text_color(s_ampm_layer, s_secondary_color);
   layer_add_child(window_layer, text_layer_get_layer(s_ampm_layer));
   
   // Battery text (bottom left)
@@ -294,7 +356,8 @@ static void main_window_load(Window *window) {
 
 // Main window unload
 static void main_window_unload(Window *window) {
-  text_layer_destroy(s_time_layer);
+  text_layer_destroy(s_hour_layer);
+  text_layer_destroy(s_minute_layer);
   text_layer_destroy(s_ampm_layer);
   text_layer_destroy(s_date_layer);
   text_layer_destroy(s_battery_layer);
@@ -304,8 +367,8 @@ static void main_window_unload(Window *window) {
 
 // Init
 static void init() {
-  // Load saved data
-  load_max_steps();
+  // Load settings
+  load_settings();
   
   // Create main window
   s_main_window = window_create();
@@ -325,6 +388,10 @@ static void init() {
     // Health service available
   }
   #endif
+
+  // Register callbacks
+  app_message_register_inbox_received(inbox_received_callback);
+  app_message_open(128, 128);
 }
 
 // Deinit
