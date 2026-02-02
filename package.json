@@ -1,16 +1,19 @@
 {
-  "name": "new-watchface",
-  "author": "MakeAwesomeHappen",
+  "name": "dual-arc",
+  "author": "Eduardo Chiaro",
   "version": "1.0.0",
   "keywords": [
-    "pebble-app"
+    "pebble-app",
+    "dual", 
+    "arc", 
+    "watchface"
   ],
   "private": true,
   "dependencies": {
     "@rebble/clay": "^1.0.6"
   },
   "pebble": {
-    "displayName": "new-watchface",
+    "displayName": "Dual Arc",
     "uuid": "de5cdf7d-30da-4bce-9784-a94f2b43200d",
     "sdkVersion": "3",
     "enableMultiJS": true,
@@ -36,7 +39,14 @@
       "STEP_GOAL"
     ],
     "resources": {
-      "media": []
+      "media": [
+        {
+          "menuIcon": "true",
+          "type": "png",
+          "name": "MENU_ICON",
+          "file": "icon.png"
+        }
+      ]
     }
   }
 }

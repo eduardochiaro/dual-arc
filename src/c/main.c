@@ -1,7 +1,6 @@
 #include <pebble.h>
 
 // Forward declarations
-static void update_display();
 static void update_time();
 static void update_steps();
 
@@ -95,14 +94,9 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
   }
 
   save_settings();
-
-  update_display();
-  
-}
-
-static void update_display() {
+  update_time();
   layer_mark_dirty(s_canvas_layer);
-  window_set_background_color(s_main_window, s_background_color);
+  
 }
 
 // Update battery level
@@ -178,6 +172,7 @@ static void update_time() {
 }
 
 static void set_layer_colors() {
+  window_set_background_color(s_main_window, s_background_color);
   text_layer_set_text_color(s_hour_layer, s_foreground_color);
   text_layer_set_text_color(s_minute_layer, s_secondary_color);
   text_layer_set_text_color(s_date_layer, s_foreground_color);
@@ -359,7 +354,9 @@ static void main_window_load(Window *window) {
   // Initialize data
   battery_callback(battery_state_service_peek());
   update_time();
+  #if defined(PBL_HEALTH)
   update_steps();
+  #endif
 }
 
 // Main window unload
