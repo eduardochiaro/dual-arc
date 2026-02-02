@@ -36,12 +36,11 @@ static GColor s_secondary_color;
 static bool s_use_24h = true;
 
 // Colors for the arcs and bars
-static GColor s_color_teal;
-static GColor s_color_orange;
-static GColor s_color_pink;
-static GColor s_color_yellow;
-static GColor s_color_background_yellow;
-static GColor s_color_background_pink;
+static GColor s_color_steps;
+static GColor s_color_battery;
+
+static GColor s_color_background_steps;
+static GColor s_color_background_battery;
 
 // Load settings
 static void load_settings() {
@@ -244,7 +243,7 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
                          arc_radius * 2, arc_radius * 2);
   
   // Left arc background (battery)
-  graphics_context_set_stroke_color(ctx, s_color_background_yellow);
+  graphics_context_set_stroke_color(ctx, s_color_background_battery);
   graphics_context_set_stroke_width(ctx, arc_width);
   graphics_draw_arc(ctx, arc_rect, GOvalScaleModeFitCircle, left_arc_start, left_arc_end);
   
@@ -252,13 +251,13 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   if (s_battery_level > 0) {
     int32_t arc_range = left_arc_end - left_arc_start;
     int32_t fill_end = left_arc_start + (arc_range * s_battery_level / 100);
-    graphics_context_set_stroke_color(ctx, s_color_yellow);
+    graphics_context_set_stroke_color(ctx, s_color_battery);
     graphics_context_set_stroke_width(ctx, arc_width - 2);
     graphics_draw_arc(ctx, arc_rect, GOvalScaleModeFitCircle, left_arc_start, fill_end);
   }
   
   // Right arc background (steps)
-  graphics_context_set_stroke_color(ctx, s_color_background_pink);
+  graphics_context_set_stroke_color(ctx, s_color_background_steps);
   graphics_context_set_stroke_width(ctx, arc_width);
   graphics_draw_arc(ctx, arc_rect, GOvalScaleModeFitCircle, right_arc_start, right_arc_end);
   
@@ -270,7 +269,7 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   if (steps_percent > 0) {
     int32_t arc_range = right_arc_end - right_arc_start;
     int32_t fill_start = right_arc_end - (arc_range * steps_percent / 100);
-    graphics_context_set_stroke_color(ctx, s_color_pink);
+    graphics_context_set_stroke_color(ctx, s_color_steps);
     graphics_context_set_stroke_width(ctx, arc_width - 2);
     graphics_draw_arc(ctx, arc_rect, GOvalScaleModeFitCircle, fill_start, right_arc_end);
   }
@@ -278,7 +277,7 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   // Draw small dots at center bottom
   graphics_context_set_fill_color(ctx, s_secondary_color);
   for (int i = 0; i < 3; i++) {
-    graphics_fill_circle(ctx, GPoint(center.x - 4 + i * 4, center.y + 58), 1);
+    graphics_fill_circle(ctx, GPoint(center.x - 4 + i * 4, center.y + radius - (arc_width / 2)), 1);
   }
 
   set_layer_colors();
@@ -302,12 +301,10 @@ static void main_window_load(Window *window) {
   APP_LOG(APP_LOG_LEVEL_DEBUG, "loaded main window");
   
   // Initialize colors
-  s_color_teal = GColorTiffanyBlue;
-  s_color_orange = GColorOrange;
-  s_color_pink = GColorMelon;
-  s_color_yellow = GColorYellow;
-  s_color_background_yellow = GColorArmyGreen;
-  s_color_background_pink = GColorBulgarianRose;
+  s_color_steps = PBL_IF_COLOR_ELSE(GColorFolly, GColorWhite);
+  s_color_battery = PBL_IF_COLOR_ELSE(GColorYellow, GColorWhite);
+  s_color_background_battery = PBL_IF_COLOR_ELSE(GColorArmyGreen, GColorDarkGray);
+  s_color_background_steps = PBL_IF_COLOR_ELSE(GColorBulgarianRose, GColorDarkGray);
 
   // Set window background
   window_set_background_color(window, s_background_color);
@@ -344,13 +341,17 @@ static void main_window_load(Window *window) {
   layer_add_child(window_layer, text_layer_get_layer(s_minute_layer));
   
   // Battery text (bottom left)
-  s_battery_layer = create_text_layer(GRect(center.x - 50, PBL_IF_ROUND_ELSE(center.y + 22, center.y + 10), 50, 20),
+  int y_post = PBL_IF_ROUND_ELSE(center.y + 22, center.y + 10);
+  if (PBL_PLATFORM_TYPE_CURRENT == PlatformTypeEmery) {
+    y_post = center.y + 26;
+  }
+  s_battery_layer = create_text_layer(GRect(center.x - 50, y_post, 50, 20),
                                        fonts_get_system_font(FONT_KEY_GOTHIC_14),
                                        GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(s_battery_layer));
   
   // Steps text (bottom right)  
-  s_steps_layer = create_text_layer(GRect(center.x + 5, PBL_IF_ROUND_ELSE(center.y + 22, center.y + 10), 50, 20),
+  s_steps_layer = create_text_layer(GRect(center.x + 5, y_post, 50, 20),
                                      fonts_get_system_font(FONT_KEY_GOTHIC_14),
                                      GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(s_steps_layer));
