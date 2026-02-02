@@ -17,7 +17,7 @@ A modern digital watchface combining style and functionality. Features include l
 ![Emery 1](assets/emery.png)
 
 ## Store
-[Rebble App Store](https://apps.rebble.io/en_US/application/)
+[Rebble App Store](https://apps.rebble.io/en_US/application/6980f66ae145ac00097cbaa4)
 
 
 ## Support
