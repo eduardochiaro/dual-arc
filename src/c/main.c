@@ -1,5 +1,10 @@
 #include <pebble.h>
 
+// Forward declarations
+static void update_display();
+static void update_time();
+static void update_steps();
+
 // Main window and layers
 static Window *s_main_window;
 static Layer *s_canvas_layer;
@@ -7,7 +12,6 @@ static Layer *s_canvas_layer;
 // Text layers
 static TextLayer *s_hour_layer;
 static TextLayer *s_minute_layer;
-static TextLayer *s_ampm_layer;
 static TextLayer *s_date_layer;
 static TextLayer *s_battery_layer;
 static TextLayer *s_steps_layer;
@@ -41,6 +45,7 @@ static GColor s_color_background_pink;
 
 // Load settings
 static void load_settings() {
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "load settings called");
   s_use_24h = persist_exists(MESSAGE_KEY_USE_24_HOUR) ? persist_read_bool(MESSAGE_KEY_USE_24_HOUR) : true;
   s_background_color = persist_exists(MESSAGE_KEY_BACKGROUND_COLOR) ? (GColor){ .argb = (uint8_t)persist_read_int(MESSAGE_KEY_BACKGROUND_COLOR) } : GColorBlack;
   s_foreground_color = persist_exists(MESSAGE_KEY_FOREGROUND_COLOR) ? (GColor){ .argb = (uint8_t)persist_read_int(MESSAGE_KEY_FOREGROUND_COLOR) } : GColorWhite;
@@ -50,6 +55,7 @@ static void load_settings() {
 
 // Save settings
 static void save_settings() {
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "save settings called");
   persist_write_bool(MESSAGE_KEY_USE_24_HOUR, s_use_24h);
   persist_write_int(MESSAGE_KEY_BACKGROUND_COLOR, s_background_color.argb);
   persist_write_int(MESSAGE_KEY_FOREGROUND_COLOR, s_foreground_color.argb);
@@ -59,37 +65,37 @@ static void save_settings() {
 
 // Inbox received callback
 static void inbox_received_callback(DictionaryIterator *iterator, void *context) {
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "inbox received callback called");
   Tuple *use_24h_tuple = dict_find(iterator, MESSAGE_KEY_USE_24_HOUR);
-  bool changed = false;
   
   if (use_24h_tuple) {
     s_use_24h = use_24h_tuple->value->int32 == 1;
-    changed = true;
   }
 
   Tuple *bgcolor_tuple = dict_find(iterator, MESSAGE_KEY_BACKGROUND_COLOR);
   if (bgcolor_tuple) {
     s_background_color = GColorFromHEX(bgcolor_tuple->value->int32);
-    changed = true;
   }
 
   Tuple *hourscolor_tuple = dict_find(iterator, MESSAGE_KEY_FOREGROUND_COLOR);
   if (hourscolor_tuple) {
     s_foreground_color = GColorFromHEX(hourscolor_tuple->value->int32);
-    changed = true;
   }
 
   Tuple *minutescolor_tuple = dict_find(iterator, MESSAGE_KEY_SECONDARY_COLOR);
   if (minutescolor_tuple) {
     s_secondary_color = GColorFromHEX(minutescolor_tuple->value->int32);
-    changed = true;
   }
 
   save_settings();
 
-  if (changed) {
-    layer_mark_dirty(s_canvas_layer);
-  }
+  update_display();
+  
+}
+
+static void update_display() {
+  layer_mark_dirty(s_canvas_layer);
+  window_set_background_color(s_main_window, s_background_color);
 }
 
 // Update battery level
@@ -99,9 +105,7 @@ static void battery_callback(BatteryChargeState state) {
   if (s_battery_layer) {
     text_layer_set_text(s_battery_layer, s_battery_buffer);
   }
-  if (s_canvas_layer) {
-    layer_mark_dirty(s_canvas_layer);
-  }
+  layer_mark_dirty(s_canvas_layer);
 }
 
 // Update step count
@@ -117,9 +121,7 @@ static void update_steps() {
   if (s_steps_layer) {
     text_layer_set_text(s_steps_layer, s_steps_buffer);
   }
-  if (s_canvas_layer) {
-    layer_mark_dirty(s_canvas_layer);
-  }
+  layer_mark_dirty(s_canvas_layer);
 }
 
 // Health event handler
@@ -166,20 +168,16 @@ static void update_time() {
   if (s_minute_layer) {
     text_layer_set_text(s_minute_layer, s_minute_buffer);
   }
-  if (s_ampm_layer) {
-    text_layer_set_text(s_ampm_layer, s_ampm_buffer);
-  }
   if (s_date_layer) {
     text_layer_set_text(s_date_layer, s_date_buffer);
   }
+  
+  layer_mark_dirty(s_canvas_layer);
 }
 
 // Tick handler
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   update_time();
-  
-  // Update steps every minute
-  update_steps();
 }
 
 // Draw the canvas (arcs and bars)
@@ -286,6 +284,7 @@ static void main_window_load(Window *window) {
   Layer *window_layer = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(window_layer);
   GPoint center = grect_center_point(&bounds);
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "loaded main window");
   
   // Initialize colors
   s_color_teal = GColorTiffanyBlue;
@@ -323,18 +322,11 @@ static void main_window_load(Window *window) {
   layer_add_child(window_layer, text_layer_get_layer(s_hour_layer));
   
   // Minute (center right, light gray)
-  s_minute_layer = create_text_layer(GRect(center.x + 2, center.y - 30, !s_use_24h ? center.x - 27 : center.x, 50),
+  s_minute_layer = create_text_layer(GRect(center.x + 2, center.y - 30, center.x, 50),
                                       time_font,
                                       GTextAlignmentLeft);
   text_layer_set_text_color(s_minute_layer, s_secondary_color);
   layer_add_child(window_layer, text_layer_get_layer(s_minute_layer));
-  
-  // AM/PM (next to time)
-  s_ampm_layer = create_text_layer(GRect(center.x + 42, center.y - 8, 30, 20),
-                                    fonts_get_system_font(FONT_KEY_LECO_26_BOLD_NUMBERS_AM_PM),
-                                    GTextAlignmentLeft);
-  text_layer_set_text_color(s_ampm_layer, s_secondary_color);
-  layer_add_child(window_layer, text_layer_get_layer(s_ampm_layer));
   
   // Battery text (bottom left)
   s_battery_layer = create_text_layer(GRect(center.x - 50, PBL_IF_ROUND_ELSE(center.y + 22, center.y + 10), 50, 20),
@@ -358,7 +350,6 @@ static void main_window_load(Window *window) {
 static void main_window_unload(Window *window) {
   text_layer_destroy(s_hour_layer);
   text_layer_destroy(s_minute_layer);
-  text_layer_destroy(s_ampm_layer);
   text_layer_destroy(s_date_layer);
   text_layer_destroy(s_battery_layer);
   text_layer_destroy(s_steps_layer);
@@ -366,7 +357,7 @@ static void main_window_unload(Window *window) {
 }
 
 // Init
-static void init() {
+static void init(void) {
   // Load settings
   load_settings();
   
@@ -391,7 +382,7 @@ static void init() {
 
   // Register callbacks
   app_message_register_inbox_received(inbox_received_callback);
-  app_message_open(128, 128);
+  app_message_open(128, 64);
 }
 
 // Deinit

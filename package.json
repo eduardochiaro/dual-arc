@@ -22,6 +22,9 @@
       "emery",
       "flint"
     ],
+    "capabilities": [
+      "health"
+    ],
     "watchapp": {
       "watchface": true
     },
