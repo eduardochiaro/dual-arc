@@ -49,8 +49,7 @@ module.exports = [
         "attributes": {
           "type": "number",
           "min": 1000,
-          "max": 50000,
-          "step": 500
+          "max": 50000
         }
       }
     ]

@@ -17,9 +17,9 @@ static TextLayer *s_battery_layer;
 static TextLayer *s_steps_layer;
 
 // Data
-static int s_battery_level = 0;
-static int s_current_steps = 0;
-static int s_max_steps = 10000;  // Default max, will be updated
+static int s_battery_level;
+static int s_current_steps;
+static int32_t s_max_steps;  // Default max, will be updated
 
 // Buffers
 static char s_hour_buffer[4];
@@ -50,7 +50,7 @@ static void load_settings() {
   s_background_color = persist_exists(MESSAGE_KEY_BACKGROUND_COLOR) ? (GColor){ .argb = (uint8_t)persist_read_int(MESSAGE_KEY_BACKGROUND_COLOR) } : GColorBlack;
   s_foreground_color = persist_exists(MESSAGE_KEY_FOREGROUND_COLOR) ? (GColor){ .argb = (uint8_t)persist_read_int(MESSAGE_KEY_FOREGROUND_COLOR) } : GColorWhite;
   s_secondary_color = persist_exists(MESSAGE_KEY_SECONDARY_COLOR) ? (GColor){ .argb = (uint8_t)persist_read_int(MESSAGE_KEY_SECONDARY_COLOR) } : GColorLightGray;
-  s_max_steps = persist_exists(MESSAGE_KEY_STEP_GOAL) ? persist_read_int(MESSAGE_KEY_STEP_GOAL) : 10000;
+  s_max_steps = persist_exists(MESSAGE_KEY_STEP_GOAL) ? persist_read_int(MESSAGE_KEY_STEP_GOAL) : 8000;
 }
 
 // Save settings
@@ -87,6 +87,14 @@ static void inbox_received_callback(DictionaryIterator *iterator, void *context)
     s_secondary_color = GColorFromHEX(minutescolor_tuple->value->int32);
   }
 
+  Tuple *stepgoal_tuple = dict_find(iterator, MESSAGE_KEY_STEP_GOAL);
+  if (stepgoal_tuple) {
+     s_max_steps = atoi(stepgoal_tuple->value->cstring);
+    if (s_max_steps < 1000) s_max_steps = 1000;
+    if (s_max_steps > 50000) s_max_steps = 50000;
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "step goal updated to %lu", s_max_steps); 
+  }
+
   save_settings();
 
   update_display();
@@ -111,11 +119,6 @@ static void battery_callback(BatteryChargeState state) {
 // Update step count
 static void update_steps() {
   s_current_steps = (int)health_service_sum_today(HealthMetricStepCount);
-  
-  // Update max steps if current exceeds it
-  if (s_current_steps > s_max_steps) {
-    s_max_steps = s_current_steps;
-  }
   
   snprintf(s_steps_buffer, sizeof(s_steps_buffer), "%05d", s_current_steps);
   if (s_steps_layer) {
@@ -261,7 +264,9 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   
   // Right arc fill (steps) - pink
   int steps_percent = (s_current_steps * 100) / s_max_steps;
+  
   if (steps_percent > 100) steps_percent = 100;
+    APP_LOG(APP_LOG_LEVEL_DEBUG, "step max: %lu", s_max_steps); 
   if (steps_percent > 0) {
     int32_t arc_range = right_arc_end - right_arc_start;
     int32_t fill_start = right_arc_end - (arc_range * steps_percent / 100);
