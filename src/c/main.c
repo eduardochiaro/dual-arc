@@ -175,6 +175,14 @@ static void update_time() {
   layer_mark_dirty(s_canvas_layer);
 }
 
+static void set_layer_colors() {
+  text_layer_set_text_color(s_hour_layer, s_foreground_color);
+  text_layer_set_text_color(s_minute_layer, s_secondary_color);
+  text_layer_set_text_color(s_date_layer, s_foreground_color);
+  text_layer_set_text_color(s_battery_layer, s_foreground_color);
+  text_layer_set_text_color(s_steps_layer, s_foreground_color);
+} 
+
 // Tick handler
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   update_time();
@@ -188,7 +196,7 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   int radius = (bounds.size.w < bounds.size.h ? bounds.size.w : bounds.size.h) / 2 - 8;
   
   // Draw outer arc decorations (tick marks around edge)
-  graphics_context_set_stroke_color(ctx, GColorDarkGray);
+  graphics_context_set_stroke_color(ctx, s_secondary_color);
   graphics_context_set_stroke_width(ctx, 1);
   
   for (int i = -15; i <= 15; i++) {
@@ -263,10 +271,12 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   }
   
   // Draw small dots at center bottom
-  graphics_context_set_fill_color(ctx, GColorDarkGray);
+  graphics_context_set_fill_color(ctx, s_secondary_color);
   for (int i = 0; i < 3; i++) {
-    graphics_fill_circle(ctx, GPoint(center.x - 4 + i * 4, center.y + 52), 1);
+    graphics_fill_circle(ctx, GPoint(center.x - 4 + i * 4, center.y + 58), 1);
   }
+
+  set_layer_colors();
 }
 
 // Create text layer helper
