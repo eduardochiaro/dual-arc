@@ -1,7 +1,7 @@
 {
   "name": "dual-arc",
   "author": "Eduardo Chiaro",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "keywords": [
     "pebble-app",
     "dual", 
@@ -9,8 +9,15 @@
     "watchface"
   ],
   "private": true,
+  "scripts": {
+    "build": "pebble clean && pebble build",
+    "emulator": "npm run build && pebble install --emulator ",
+    "phone": "npm run build && pebble install --phone",
+    "config": "pebble emu-app-config --emulator",
+    "logs": "pebble logs"
+  },
   "dependencies": {
-    "@rebble/clay": "^1.0.6"
+    "@rebble/clay": "^1.0.10"
   },
   "pebble": {
     "displayName": "Dual Arc",
@@ -23,7 +30,8 @@
       "chalk",
       "diorite",
       "emery",
-      "flint"
+      "flint",
+      "gabbro"
     ],
     "capabilities": [
       "health"

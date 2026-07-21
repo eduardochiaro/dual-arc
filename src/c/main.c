@@ -221,7 +221,7 @@ static void canvas_update_proc(Layer *layer, GContext *ctx) {
   // Quarter arc progress indicators at bottom
   int arc_radius = radius - 4;
   int arc_width = PBL_IF_ROUND_ELSE(14, 8);
-  if (PBL_PLATFORM_TYPE_CURRENT == PlatformTypeEmery) {
+  if (PBL_PLATFORM_TYPE_CURRENT == PlatformTypeEmery || PBL_PLATFORM_TYPE_CURRENT == PlatformTypeGabbro) {
     arc_width = 14;
   }
   
@@ -309,45 +309,61 @@ static void main_window_load(Window *window) {
   layer_set_update_proc(s_canvas_layer, canvas_update_proc);
   layer_add_child(window_layer, s_canvas_layer);
   
+  // Fonts and vertical metrics. Gabbro (200x228) is the largest display, so it
+  // gets its own scale for every section instead of the basalt-sized defaults.
+  GFont date_font  = fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD);
+  GFont small_font = fonts_get_system_font(FONT_KEY_GOTHIC_14);
+  GFont time_font  = fonts_get_system_font(PBL_IF_ROUND_ELSE(FONT_KEY_LECO_42_NUMBERS, FONT_KEY_LECO_36_BOLD_NUMBERS));
+  if (PBL_PLATFORM_TYPE_CURRENT == PlatformTypeEmery ) {
+    time_font = fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
+  }
+
+  int date_y = center.y - 48, date_h = 24;
+  int time_y = center.y - 30, time_h = 50;
+  int y_post = PBL_IF_ROUND_ELSE(center.y + 22, center.y + 10), post_h = 20, post_w = 50;
+  if (PBL_PLATFORM_TYPE_CURRENT == PlatformTypeEmery) {
+    y_post = center.y + 26;
+  }
+
+  #if defined(PBL_PLATFORM_GABBRO)
+    date_font  = fonts_get_system_font(FONT_KEY_GOTHIC_28_BOLD);  // 28 is the largest Gothic in the gabbro SDK
+    small_font = fonts_get_system_font(FONT_KEY_GOTHIC_24);
+    time_font  = fonts_get_system_font(FONT_KEY_LECO_60_NUMBERS_AM_PM);
+    date_y = center.y - 68; date_h = 34;
+    time_y = center.y - 40; time_h = 68;
+    y_post = center.y + 44; post_h = 30; post_w = 80;
+  #endif
+
   // Create text layers
   // Date (above time)
-  s_date_layer = create_text_layer(GRect(0, center.y - 48, bounds.size.w, 24),
-                                    fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
+  s_date_layer = create_text_layer(GRect(0, date_y, bounds.size.w, date_h),
+                                    date_font,
                                     GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(s_date_layer));
 
-  GFont time_font = fonts_get_system_font(PBL_IF_ROUND_ELSE(FONT_KEY_LECO_42_NUMBERS, FONT_KEY_LECO_36_BOLD_NUMBERS));
-  if (PBL_PLATFORM_TYPE_CURRENT == PlatformTypeEmery) {
-    time_font = fonts_get_system_font(FONT_KEY_LECO_42_NUMBERS);
-  }
-  
   // Hour (center left, white)
-  s_hour_layer = create_text_layer(GRect(0, center.y - 30, center.x - 2, 50),
+  s_hour_layer = create_text_layer(GRect(0, time_y, center.x - 2, time_h),
                                     time_font,
                                     GTextAlignmentRight);
   text_layer_set_text_color(s_hour_layer, s_foreground_color);
   layer_add_child(window_layer, text_layer_get_layer(s_hour_layer));
-  
+
   // Minute (center right, light gray)
-  s_minute_layer = create_text_layer(GRect(center.x + 2, center.y - 30, center.x, 50),
+  s_minute_layer = create_text_layer(GRect(center.x + 2, time_y, center.x, time_h),
                                       time_font,
                                       GTextAlignmentLeft);
   text_layer_set_text_color(s_minute_layer, s_secondary_color);
   layer_add_child(window_layer, text_layer_get_layer(s_minute_layer));
-  
+
   // Battery text (bottom left)
-  int y_post = PBL_IF_ROUND_ELSE(center.y + 22, center.y + 10);
-  if (PBL_PLATFORM_TYPE_CURRENT == PlatformTypeEmery) {
-    y_post = center.y + 26;
-  }
-  s_battery_layer = create_text_layer(GRect(center.x - 50, y_post, 50, 20),
-                                       fonts_get_system_font(FONT_KEY_GOTHIC_14),
+  s_battery_layer = create_text_layer(GRect(center.x - post_w, y_post, post_w, post_h),
+                                       small_font,
                                        GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(s_battery_layer));
-  
-  // Steps text (bottom right)  
-  s_steps_layer = create_text_layer(GRect(center.x + 5, y_post, 50, 20),
-                                     fonts_get_system_font(FONT_KEY_GOTHIC_14),
+
+  // Steps text (bottom right)
+  s_steps_layer = create_text_layer(GRect(center.x + 5, y_post, post_w, post_h),
+                                     small_font,
                                      GTextAlignmentCenter);
   layer_add_child(window_layer, text_layer_get_layer(s_steps_layer));
   

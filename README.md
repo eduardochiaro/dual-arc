@@ -4,20 +4,27 @@ A modern digital watchface combining style and functionality. Features include l
 
 ## Screenshots
 ### Pebble Classic/Steel/2/Duo
-![Aplite 1](assets/aplite.png)
+![Aplite 1](assets/aplite_1.png)
+![Flint 1](assets/flint_1.png)
 
 ### Pebble Time/Time Steel
 ![Basalt 1](assets/basalt_1.png)
 ![Basalt 2](assets/basalt_2.png)
 
 ### Pebble Time Round
-![Chalk 1](assets/chalk.png)
+![Chalk 1](assets/chalk_1.png)
 
 ### Pebble Time 2
-![Emery 1](assets/emery.png)
+![Emery 1](assets/emery_1.png)
+
+### Pebble Time Round 2
+![Gabbro 1](assets/gabbro_1.png)
+
 
 ## Store
 [Rebble App Store](https://apps.rebble.io/en_US/application/6980f66ae145ac00097cbaa4)
+
+[Pebble App Store](https://apps.repebble.com/6980f66ae145ac00097cbaa4)
 
 
 ## Support
