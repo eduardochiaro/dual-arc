@@ -9,7 +9,6 @@ A modern digital watchface combining style and functionality. Features include l
 
 ### Pebble Time/Time Steel
 ![Basalt 1](assets/basalt_1.png)
-![Basalt 2](assets/basalt_2.png)
 
 ### Pebble Time Round
 ![Chalk 1](assets/chalk_1.png)
